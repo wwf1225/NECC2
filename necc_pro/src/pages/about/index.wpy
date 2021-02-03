@@ -1,0 +1,24 @@
+<template>
+  <web-view src="{{src}}"></web-view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import T from "../../utils/i18n.js";
+  import {url_lab_intro} from "../../utils/wx_common";
+
+  export default class AboutAs extends wepy.page {
+    data = {
+      src: ""
+    }
+
+    onLoad(options) {
+        this.src = url_lab_intro;
+      this.$apply();
+    }
+  }
+</script>
+
+<style lang="less">
+
+</style>

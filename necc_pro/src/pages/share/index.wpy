@@ -1,0 +1,334 @@
+<template>
+  <view class="container">
+
+    <view style="margin-top:90rpx">
+      <image src="../../images/icon_logo2.png" mode='aspectFill' style="width:400rpx;height:26vh"></image>
+    </view>
+
+    <!-- 编码和展馆信息 -->
+    <view style="margin-top:20rpx;flex-direction:row;display:flex;align-items:center">
+<!--      <image src="../../images/place_point.png" mode='aspectFill' style="width:56rpx;height:76rpx"></image>-->
+      <image src="../../images/n_collect_icon_2@2x.png" mode='aspectFill' style="width:28rpx;height:38rpx"></image>
+      <view style="margin-left:30rpx;margin-top: 10rpx;">
+        <view
+          style="font-weight:500;font-size:32rpx; color: #000000;width: 26vw;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;text-align: left;display: inline-block;">
+          {{name === '' ? noName : bothName}}
+        </view>
+<!--        <view style="font-size:12px;margin-top:5px">{{necc}} {{floorName}}</view>-->
+      </view>
+    </view>
+
+    <!-- 复制粘贴编码 -->
+    <view class="textShow" @tap.stop="saveMessage()">
+      <view class="copyText">
+        <image src="../../images/copy.png" mode='aspectFill' style="width:50rpx;height:50rpx;margin-right:8rpx"></image>
+        <view style="font-size:14px">
+          {{currentPosition}}：
+        </view>
+      </view>
+      <view style="font-size:18px;font-weight:600;color: #AE1E23">{{kyeCode}}</view>
+      <view style="font-size:20rpx;color:gray">{{copyCode}}</view>
+    </view>
+    <!-- <view @tap.stop="navigateTo()">跳转小程序</view> -->
+    <button class="itemStyle" data-name="shareUp" open-type='share'>
+      <image src="../../images/n_wx_icon@2x.png" mode='aspectFill'
+             style="width:53rpx;height:44rpx;margin-right:48rpx"></image>
+      {{todo}}
+    </button>
+    <!--<button class="itemStyleDown" hidden="{{status}}" data-name="shareDown" open-type='share'>
+      <image src="../../images/n_wx_icon@2x.png" mode='aspectFill'
+             style="width:53rpx;height:44rpx;margin-right:48rpx"></image>
+      {{shareAddress}}
+    </button>-->
+    <!--    <image src="../../images/logo_dao.png" mode='widthFix' style="width:258rpx;height:4vh;position:absolute;bottom:110rpx"></image>-->
+
+  </view>
+</template>
+<script>
+  import wepy from 'wepy';
+  import T from '../../utils/i18n.js';
+  import 'wepy-async-function';
+  import { url_share } from '../../utils/wx_common';
+
+  export default class ShareView extends wepy.page {
+    config = {
+      navigationBarTitleText: '分享'
+    };
+
+    data = {
+      copySuccess: '',
+      noName: '',
+      currentPosition: '',
+      copyCode: '',
+      necc: '',
+      todo: '',
+      shareAddress: '',
+      save: '',
+      kyeCode: '',
+      name: '',
+      showloading: true,
+      floorName: '',
+      PoiName: '',
+      bothName: '',
+      poiGroupID: '',
+      poiEname: '',
+      poiCoorX: '',
+      poiCoorY: '',
+      status: true
+    };
+
+    methods = {
+      onShareAppMessage(res) {
+        console.log(res);
+        console.log(T.locale);
+        var that = this;
+        if(T.locale == 'zh_CN') {
+          var shareTitle = that.name;
+        }else{
+          var shareTitle = that.poiEname;
+        }
+        return {
+          title: `${shareTitle}`,
+          link:url_share, // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+          imgUrl: "", // 分享图标 业务域名
+          path:  `/pages/index?poiFid=${that.poiFID}&floorID=${that.poiGroupID}&mapCoordX=${that.poiCoorX}&mapCoordY=${that.poiCoorY}&name=${that.name}&ename=${that.poiEname}`, // 路径，传递参数到指定页面。
+          success: function (res) {
+              console.log(res)
+          },
+          cancel: function (res) {
+              console.log('------');
+          },
+          fail: function (res) {
+              console.log(res);
+          }
+        }
+      }
+
+
+      // onShareAppMessage(res) {
+      //   console.error('分享777=========res', res);
+      //   console.log(T.locale);
+      //   var that = this;
+      //
+      //   if (res.from == 'button') {//自定义按钮分享
+      //     //如果form值是button，则target是触发这次转发事件的button，否则为undefined
+      //     if (res.target.dataset.name == 'shareUp') {//分享1
+      //       console.log('点击第一个按钮');
+      //
+      //       if (T.locale == 'zh_CN') {
+      //         var shareTitle = that.name;
+      //       } else {
+      //         var shareTitle = that.poiEname;
+      //       }
+      //       return {
+      //         title: `${shareTitle}`,
+      //         link: url_share, // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+      //         imgUrl: '', // 分享图标 业务域名
+      //         path: `/pages/index?poiFid=${that.poiFID}&floorID=${that.poiGroupID}&mapCoordX=${that.poiCoorX}&mapCoordY=${that.poiCoorY}&name=${that.name}&ename=${that.poiEname}`, // 路径，传递参数到指定页面。
+      //         success: function(res) {
+      //           console.log(res);
+      //         },
+      //         cancel: function(res) {
+      //           console.log('------');
+      //         },
+      //         fail: function(res) {
+      //           console.log(res);
+      //         }
+      //       };
+      //
+      //     } else if (res.target.dataset.name == 'shareDown') {//分享2
+      //       console.log('点击第二个按钮');
+      //       return {
+      //         title: `地址码：${this.kyeCode}`,
+      //         link: url_share, // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+      //         imgUrl: '', // 分享图标 业务域名
+      //         success: function(res) {
+      //           console.log(res);
+      //         },
+      //         cancel: function(res) {
+      //           console.log('------');
+      //         },
+      //         fail: function(res) {
+      //           console.log(res);
+      //         }
+      //       }
+      //
+      //
+      //     }
+      //   } else {
+      //     //右上角转发菜单
+      //     console.log('右上角转发菜单');
+      //   }
+      // }
+
+
+    };
+
+
+    onLoad(options) {
+      console.log('=====', options);
+      if (options.PoiFid) {
+        console.log('POI分享');
+        this.poiFID = options.PoiFid;
+        this.poiGroupID = options.PoigroupID;
+        this.poiEname = options.PoiEname;
+        this.poiCoorX = options.PoiCoorX;
+        this.poiCoorY = options.PoiCoorY;
+        this.PoiFlag = options.PoiFlag;
+        this.status = false;
+      } else {
+        console.log('实时位置分享');
+        this.poiGroupID = options.currentGroup;
+        this.poiCoorX = options.currentX;
+        this.poiCoorY = options.currentY;
+        this.poiEname = null;
+        this.poiFID = null;
+      }
+      //楼层name和keyCode二者都有
+      this.floorName = options.floorName;
+      this.kyeCode = options.shareKeyEnCode;
+      //=====h5中界面传递过来的参数=====//
+      this.showloading = false;
+      //唯独当前的POI名称
+      if (options.PoiName) {
+        console.log('poiname: ', options.PoiName);
+        if (T.locale == 'zh_CN') {
+          this.name = options.PoiName;
+        } else {
+          this.name = options.PoiEname;
+        }
+      } else {
+        this.name = '';
+      }
+      this.bothName = `${this.name} | ${this.floorName}`;
+      this.$apply();
+      this.setLang();
+    }
+
+    setLang() {
+      this.copySuccess = T.getLanguage('copySuccess');
+      this.noName = T.getLanguage('noName');
+      this.currentPosition = T.getLanguage('currentPosition');
+      this.copyCode = T.getLanguage('copyCode');
+      this.necc = T.getLanguage('NECC');
+      this.todo = T.getLanguage('share');
+      this.shareAddress = T.getLanguage('shareAddress');
+      this.save = T.getLanguage('save');
+      this.$apply();
+    }
+
+    // navigateTo() {
+    //   wx.navigateToMiniProgram({
+    //       appId: 'appid',
+    //       success(res) {
+    //         console.log(res);
+    //       }
+    //   })
+    // }
+
+    saveMessage() {
+      var that = this;
+      //设置复制粘贴的内容
+      wepy.setClipboardData({
+        data: this.kyeCode,
+        success: function() {
+          wepy.showToast({
+            title: `${that.copySuccess}`,
+            duration: 3000
+          });
+        }
+      });
+    }
+  }
+</script>
+
+
+<style lang="less">
+  .container {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    position: fixed;
+  }
+
+  /*.itemStyle {*/
+  /*  margin-bottom: 40rpx;*/
+  /*  background-color: #2BA245 !important;*/
+  /*  color: #ffffff;*/
+  /*  line-height:80rpx;*/
+  /*  height: 80rpx;*/
+  /*  width: 240rpx;*/
+  /*  font-size: 12px;*/
+  /*  border-radius: 40rpx;*/
+  /*  margin-top: 80rpx;*/
+  /*  border: 1px solid #e6e6e6;*/
+  /*  display: flex;*/
+  /*  justify-content: center;*/
+  /*  align-items:center;*/
+  /*}*/
+
+  .itemStyle {
+    height: 84rpx;
+    width: 320rpx;
+    margin-bottom: 20rpx;
+    background-color: #2BA245 !important;
+    color: #ffffff;
+    line-height: 84rpx;
+    font-family: PingFang-SC-Medium;
+    font-size: 14px;
+    border-radius: 42rpx;
+    margin-top: 84rpx !important;
+    border: 1px solid #e6e6e6;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .itemStyle::after {
+    border: 0;
+  }
+
+
+  .itemStyleDown {
+    height: 84rpx;
+    width: 320rpx;
+    background-color: #2BA245 !important;
+    color: #ffffff;
+    line-height: 84rpx;
+    font-family: PingFang-SC-Medium;
+    font-size: 14px;
+    border-radius: 42rpx;
+    border: 1px solid #e6e6e6;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .itemStyleDown::after {
+    border: 0;
+  }
+
+
+  .textShow {
+    width: 400rpx;
+    height: 150rpx;
+    margin-top: 20rpx;
+    border: 1px solid #e6e6e6;
+    border: 1px solid #000000;
+    border-radius: 8rpx;
+    padding: 20rpx;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .copyText {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+</style>

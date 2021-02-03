@@ -1,0 +1,1083 @@
+<template>
+  <!-- <web-view src="https://ciie.naviguy.com/ciie2?openid={{openid}}&name={{name}}&ename={{ename}}&floorID={{floorID}}&mapCoordX={{mapCoordX}}&mapCoordY={{mapCoordY}}&mapFID={{mapFID}}"></web-view> -->
+  <web-view src="{{src}}"></web-view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import T from '../utils/i18n.js';
+  import { url_BaseSrc, apiBaseUrl, websocketUrl, MapId, AppCode, AppType } from '../utils/wx_common';
+  // import '../utils/reconnecting-websocket'
+
+  export default class Index extends wepy.page {
+    config = {
+      navigationBarTitleText: '导路者•进博会'
+    };
+
+    data = {
+      openid: '',
+      name: '',
+      ename: '',
+      floorID: '',
+      mapCoordX: '',
+      mapCoordY: '',
+      mapFID: '',
+      src: '',
+      baseSrc: url_BaseSrc,
+      paramsObj: {},
+      showOpenID: false,
+      dataList: [], // 获取到的全部ibeacon蓝牙标签数据
+      blueToothData: [], // 距离最近的蓝牙标签数据
+      timer: '',
+      // 是否獲取到openid
+      getOpenid: false,
+      // websocket
+      wxWebsocket: null,
+      // 轉發的藍牙標籤
+      blueToothDataTrans: [],
+      globalBeacons: {}, // beacon数据全局缓存
+      version: 0,
+      // storage 中的标签
+      labelInStorage: {},
+      BleListeners: [],
+      blueData: [],
+      // 数据传送的  websocket 是否是主动关闭
+      // 如果不是主动关闭，就要自动重新连接；
+      // 如果是主动关闭，就不要自动重新连接
+      dataTransferWSActiveClose: false,
+      // 数据传送的定时器
+      dataTransferTimer: null,
+      // 计数器（没用）
+      count: 0
+
+    };
+
+    methods = {};
+
+    handlePostMessage(e) {
+      const data = e.detail;
+    }
+
+    // onShow() {
+    //   // console.log(Object.keys(this.paramsObj).length === 0);
+    //   // if(Object.keys(this.paramsObj).length !== 0){
+    //   //   this.getChangeParamsObj(this.paramsObj);
+    //   // }
+    // }
+
+
+    // async currentRoute2() {
+    //   console.log('獲取openid');
+    //   var that = this;
+    //   this.openid = wepy.getStorageSync('openID') || null;
+    //   if (this.openid === null) {
+    //     const res = await wx.cloud.callFunction({
+    //       name: 'getMessage'
+    //     });
+    //     return res;
+    //   } else {
+    //     that.src = that.baseSrc + `?openid=${that.openid}`;
+    //     that.$apply();
+    //   }
+    // }
+
+    // 测试获取 openid
+    getCloudOpenid() {
+      return new Promise((resolve, reject) => {
+        console.log('测试获取openid+++++++++');
+        let that = this;
+        that.data.openid = wepy.getStorageSync('openID') || null;
+        if (that.data.openid === null) {
+          wx.cloud.callFunction({
+            name: 'getMessage'
+          }).then(res => {
+            that.data.openid = res.result.userInfo.openId;
+            console.log('获取 yun openid', that.data.openid);
+            wepy.setStorageSync('openID', that.data.openid);
+            // that.src = that.baseSrc + `?openid=${that.data.openid}`;
+            // that.$apply();
+            // that.data.getOpenid = true;
+            resolve(that.data.openid);
+          });
+        } else {
+          // that.src = that.baseSrc + `?openid=${that.data.openid}`;
+          // that.$apply();
+          // that.data.getOpenid = true;
+          resolve(that.data.openid);
+        }
+      });
+    }
+
+    async currentRoute() {
+      console.log('獲取openid+++++++++');
+      let that = this;
+      that.data.openid = wepy.getStorageSync('openID') || null;
+      // this.openid = null;
+      if (that.data.openid === null) {
+        await wx.cloud.callFunction({
+          name: 'getMessage'
+        }).then(res => {
+          that.data.openid = res.result.userInfo.openId;
+          console.log('獲取yun openid', that.data.openid);
+          wepy.setStorageSync('openID', that.data.openid);
+          that.src = that.baseSrc + `?openid=${that.data.openid}`;
+          that.$apply();
+          that.data.getOpenid = true;
+        });
+      } else {
+        that.src = that.baseSrc + `?openid=${that.data.openid}`;
+        that.$apply();
+        that.data.getOpenid = true;
+      }
+    }
+
+    getChangeParamsObj(data) {
+      let that = this;
+      this.floorID = data.floorID || null;
+      this.mapCoordX = data.mapCoordX || null;
+      this.mapCoordY = data.mapCoordY || null;
+      this.mapFID = data.poiFid || null;
+      this.name = data.name || null;
+      this.ename = data.ename || null;
+
+      //这三个是实时位置和POI都会传递过来的参数
+      if (this.floorID && this.mapCoordX && this.mapCoordY) {
+        that.data.openid = wepy.getStorageSync('openID') || null;
+
+        // if (that.data.openid === null) {
+        //   wx.cloud.callFunction({
+        //     name: 'getMessage'
+        //   }).then(res => {
+        //     that.data.openid = res.result.userInfo.openId;
+        //     wepy.setStorageSync('openID', that.data.openid);
+        //     that.$apply();
+        //   });
+        // }
+
+        that.getCloudOpenid()
+          .then(res => {
+            if (this.name) {
+              this.src = this.baseSrc + `?openid=${that.data.openid}&floorID=${this.floorID}&mapCoordFID=${this.mapFID}&mapCoordX=${this.mapCoordX}&mapCoordY=${this.mapCoordY}&name=${encodeURI(this.name)}&ename=${this.ename}&shareType=1`;
+              this.$apply();
+              //===分享的是POI信息===//
+            } else {
+              this.src = this.baseSrc + `?openid=${that.data.openid}&floorID=${this.floorID}&mapCoordX=${this.mapCoordX}&mapCoordY=${this.mapCoordY}&shareType=0`;
+              // console.log(this.src);
+              // wepy.showToast({
+              //   title: `${this.src}`,
+              //   icon: 'none',
+              //   duration: 2000
+              // })
+              this.$apply();
+              //===分享的是实时信息===//
+            }
+          });
+      } else {
+        // console.log("执行了默认地址");
+        // this.currentRoute();
+        that.getCloudOpenid()
+          .then(res => {
+            that.src = that.baseSrc + `?openid=${that.data.openid}`;
+            that.$apply();
+          });
+      }
+    }
+
+    // 获取版本号 检测标签的版本号，请求失败之后，会每隔3s重新请求一次，一共请求3次
+    initialLabelBeacon(reqCount = 0) {
+      console.log('进入版本号');
+      let that = this;
+      wx.request({
+        url: apiBaseUrl + '/manage/api/appclient/appdata/getLabelWechatVersion',
+        data: JSON.stringify({
+          venueuuid: MapId, // MapId国展,
+          datatype: 'LABEL_WECHAT_VERSION'
+        }),
+        method: 'POST',
+        header: {
+          'Content-type': 'application/json'
+        },
+        success: function success(res) {
+          console.log('getLabelWechatVersion ======  ', res);
+          if (res.data.code === '0' || res.data.code === 0) {
+            console.error('获取版本号：', res.data.data.version);
+            that.compareVersionWithCache(res.data.data.version);
+            // that.compareVersionWithCache(8700);
+          } else if (reqCount < 3) {
+            setTimeout(function() {
+              that.initialLabelBeacon(++reqCount);
+            }, 3000);
+          }
+
+        },
+        fail: function fail(res) {
+          // wx.showToast({ title: "1" })
+        }
+      });
+    }
+
+    // 比较版本号是否相等
+    compareVersionWithCache(version) {
+      // console.log('比较版本号++', version);
+      let that = this;
+      let cache_version = wx.getStorageSync('_version_');
+      console.log('缓存中的 cache_version: ', cache_version, cache_version == null, cache_version === '');
+      if (cache_version == null || cache_version === '') {
+        // 缓存中没有版本号，就说明没有标签数据，就重新拉取
+        wx.setStorage({
+          key: '_version_',
+          data: version
+        });
+        that.updateLabelBeacon(0, 0, function() {
+        });
+      } else {
+        wx.getStorage({
+          key: '_version_',
+          success(res) {
+            console.log('比较版本号==', res);
+            let cacheVersion = res.data;
+            console.error('cacheVersion======', cacheVersion);
+            if (version !== cacheVersion) {
+              console.log('版本不相等，执行');
+              wx.setStorage({
+                key: '_version_',
+                data: version
+              });
+              // getBluetooth
+              that.updateLabelBeacon(cacheVersion, 0, function(isSaved) {
+                // wx.setStorage({
+                //   key: '_version_',
+                //   data: version
+                // });
+              });
+            } else {
+              console.log('版本相等,未执行');
+              that.getBeaconCache();
+            }
+          }
+        });
+      }
+
+      //---------------------------------
+
+      // wx.getStorageInfo({
+      //   success(res) {
+      //     console.log('keys=====', res.keys);
+      //     if (res.keys.indexOf('_version_') == -1) {
+      //       wx.setStorage({
+      //         key: '_version_',
+      //         data: version
+      //       });
+      //       //xxxxxxxxxxxxxxxxxxxxxxxxxx 我注释了 todo
+      //       // that.getBeaconCache();
+      //     } else {
+      //       wx.getStorage({
+      //         key: '_version_',
+      //         success(res) {
+      //           console.log('比较版本号==', res);
+      //           let cacheVersion = res.data;
+      //           console.error('cacheVersion======', cacheVersion);
+      //           if (version !== cacheVersion) {
+      //             console.log('版本不相等，执行');
+      //             wx.setStorage({
+      //               key: '_version_',
+      //               data: version
+      //             });
+      //             // getBluetooth
+      //             that.updateLabelBeacon(cacheVersion, 0, function(isSaved) {
+      //               // wx.setStorage({
+      //               //   key: '_version_',
+      //               //   data: version
+      //               // });
+      //             });
+      //           } else {
+      //             console.log('版本相等,未执行');
+      //             that.getBeaconCache();
+      //           }
+      //         }
+      //       });
+      //     }
+      //   }
+      // });
+
+    }
+
+    // 获取缓存的beacon数据
+    getBeaconCache() {
+      let that = this;
+      var caches = {};
+      wx.getStorage({
+        key: '_beacons_',
+        success(res) {
+          caches = res.data;
+          that.data.globalBeacons = caches;
+        }
+      });
+      // return caches;
+    }
+
+    /**
+     * 查找蓝牙标签数据
+     * @param {String} major - 标签Major值
+     * @param {String} minor - 标签Minor值
+     * */
+    findBeacon(major, minor) {
+      if (major === undefined || minor === undefined) {
+        return this.data.globalBeacons;
+      }
+
+      return this.data.globalBeacons[`${major}_${minor}`];
+    }
+
+    /**
+     * 更新beacon的缓存数据。若请求数据失败，则每隔3s请求一次数据，一共重复3次
+     * @param cacheVersion 缓存中当前的版本号
+     * @param {Number} reqCount - 重复请求的统计次数
+     * @param {Function} callback - 缓存beacon数据之后回调方法
+     * */
+    updateLabelBeacon(cacheVersion, reqCount = 0, callback) {
+      console.log('更新Beacon');
+      let that = this;
+      // wx.getStorage({
+      //   key: '_version_',
+      //   success(res) {
+      //     if (res.data == null) {
+      //       that.data.version = 0;
+      //     } else {
+      //       that.data.version = res.data;
+      //     }
+      //   }
+      // });
+      wx.request({
+        url: apiBaseUrl + '/manage/api/appclient/appdata/getBleWechatLabelDataWithCache',
+        data: JSON.stringify({
+          'venueuuid': MapId,
+          'curVersion': cacheVersion,
+          'appcode': AppCode,
+          'apptype': AppType
+        }),
+        method: 'POST',
+        header: {
+          'Content-type': 'application/json'
+        },
+        success: function success(res) {
+          if (res.data.code === 0 || res.data.code === '0') {
+            if (res.data.data != null || res.data.data != []) {
+              that.setBeaconCache(res.data.data);
+            }
+            // 测试
+            // const result = [{
+            //   direction: '',
+            //   groupId: '11',
+            //   labeldescribe: '',
+            //   labelstatus: 2,
+            //   labeluuid: '0abe651e104c04da8bc9086f2d553f8f',
+            //   major: '10055',
+            //   mark: '5.2',
+            //   markText: null,
+            //   markTextEn: null,
+            //   minor: '56051',
+            //   operationsign: 'CREATE',
+            //   threshold: -65,
+            //   type: '100102',
+            //   uuid: 'AB8190D5-D11E-4941-ACC4-42F30510B408',
+            //   venueuuid: 'e7d31e40-b88e-40ce-b000-f18012c4d567',
+            //   x: '1111111.111111111',
+            //   y: '11111111.22222222',
+            //   z: '0'
+            // },
+            // ];
+            //
+            // that.setBeaconCache(result);
+
+          } else {
+            if (reqCount < 3) {
+              setTimeout(() => {
+                that.updateLabelBeacon(cacheVersion, ++reqCount, callback);
+              }, 3000);
+            }
+          }
+
+        },
+        fail: function fail(res) {
+          // wx.showToast({ title: "1" })
+        }
+      });
+
+    }
+
+
+// 原来的思路是将所有的标签数据都缓存到一个key中，key是CacheKeys.BEACONS
+// 整理缓存的beacon数据，并缓存到本地中
+    setBeaconCache(beacons) {
+      let that = this;
+      console.log('整理缓存的beacon数据', beacons.length);
+      let caches = {};
+      var cacheBeacons = [];
+      // var cacheBeacons =  Storage.get(CacheKeys.BEACONS);
+      try {
+        cacheBeacons = wx.getStorageSync('_beacons_');
+        console.log('cacheBeacons from storage : ', cacheBeacons);
+      } catch (e) {
+        console.error('cacheBeacons 出错了', e);
+        // Do something when catch error
+      }
+      // wx.getStorage({
+      //   key: '_beacons_',
+      //   success(res) {
+      //     cacheBeacons = res.data;
+      //   }
+      // });
+      if (cacheBeacons !== null && cacheBeacons !== '') {
+        console.log('cacheBeacons===========', cacheBeacons);
+        let newBeacons = beacons;
+        caches = cacheBeacons;
+        console.log('newBeacons=======>', newBeacons);
+
+        for (let j = 0, jj = newBeacons.length; j < jj; j++) {
+          //根据新传入的数据的类型进行判断  CREATE新增
+          if (newBeacons[j].operationsign === 'CREATE') {
+            // caches.push(newBeacons[j])
+            console.log('CREATE==============');
+            let beacon = newBeacons[j];
+            const beaconId = `${beacon.major}_${beacon.minor}`;
+            console.log('beaconId======', beaconId);
+            caches[beaconId] = {
+              lng: Number(beacon.x),
+              lat: Number(beacon.y),
+              floorId: beacon.groupId + ''
+            };
+            console.log('caches[beaconId]==========CREATE', caches[beaconId]);
+            console.log('caches=====================', caches);
+            console.error('beacons=======CREATE--56041', caches['10055_56041']);
+          } else
+            //UPDATE更新
+          if (newBeacons[j].operationsign === 'UPDATE') {
+            console.log('UPDATE');
+            let beacon = newBeacons[j];
+            const beaconId = `${beacon.major}_${beacon.minor}`;
+            console.log('beaconId======', beaconId);
+            caches[beaconId] = {
+              lng: Number(beacon.x),
+              lat: Number(beacon.y),
+              floorId: beacon.groupId + ''
+            };
+            console.log('caches[beaconId]==========UPDATE', caches[beaconId]);
+            console.log('caches==========UPDATE', caches);
+            // console.error('beacons=======UPDATE-54504', caches['10055_54504']);xxxxxxxxxxxxxxxx
+            console.error('beacons=======UPDATE-40040', caches['10055_40040']);
+          } else
+            //DELECT删除
+          if (newBeacons[j].operationsign === 'DELETE') {
+            console.error('DELETE', newBeacons[j]);
+            let beacon = newBeacons[j];
+            const beaconId = `${beacon.major}_${beacon.minor}`;
+            // caches[beaconId] = null;
+            delete caches[beaconId];
+            console.error('beacons=======DELETE again: ', caches[beaconId]);
+          }
+        }
+      } else {
+        //  先申请空间
+        for (let i = 0, ii = beacons.length; i < ii; i++) {
+          let beacon = beacons[i];
+          let beaconId = `${beacon.major}_${beacon.minor}`;
+          caches[beaconId] = {
+            lng: Number(beacon.x),
+            lat: Number(beacon.y),
+            floorId: beacon.groupId + ''
+          };
+        }
+      }
+      // 更新全局缓存
+      that.data.globalBeacons = caches;
+      console.log('====caches============> ', caches);
+      // return Storage.set(CacheKeys.BEACONS, caches);
+      wx.setStorage({
+        key: '_beacons_',
+        data: caches
+      });
+    }
+
+    // 获取全部蓝牙标签数据 获取所有的beacon数据
+    getBluetooth() {
+      console.log('get all beacons');
+      let that = this;
+      wx.request({
+        url: apiBaseUrl + '/manage/api/appclient/appdata/getBleWechatLabelDataWithCache',
+        data: JSON.stringify({
+          'venueuuid': MapId,
+          'curVersion': '0',
+          'appcode': AppCode,
+          'apptype': AppType
+        }),
+        method: 'POST',
+        header: {
+          'Content-type': 'application/json'
+        },
+        success: function success(res) {
+          console.log('获取所有的beacon数据', res);
+          if (res.data.code === 0) {
+            console.log('============res', res);
+            // TODO 将缓存中的标签拿出来
+            // that.data.labelInStorage = res.data.data;
+            // console.log("Cache Label:", that.data.labelInStorage);
+            // var beaconId, beaconsObj;
+            let newBeacons = {};
+            // that.data.dataList = res.data.data;
+
+            let beacons = res.data.data;
+            // beacons.forEach((v,i) => {
+            //   beaconId = `${v.major}_${v.minor}`;
+            //   beacons[beaconId] = {
+            //     lng: Number(v.x),
+            //     lat: Number(v.y),
+            //     floorId: v.groupId + ''
+            //   };
+            //   delete beacons[i]
+            // })
+
+            for (let i = 0, len = beacons.length; i < len; i++) {
+              let beaconId = `${beacons[i].major}_${beacons[i].minor}`;
+              newBeacons[beaconId] = {
+                lng: Number(beacons[i].x),
+                lat: Number(beacons[i].y),
+                floorId: beacons[i].groupId + ''
+              };
+              // delete beacons[i];
+            }
+
+
+            let beaconsObj = { ...newBeacons };
+
+            that.data.dataList = beaconsObj; // 把处理后带有 `${major}_${minor}`键值即'10055_56080'的beacons赋值
+            console.log('beacons=======newBeacons:', newBeacons);
+            console.log('beacons=======beaconsObj:', beaconsObj);
+            that.data.labelInStorage = beaconsObj;
+            wx.setStorage({
+              key: '_beacons_',
+              data: beaconsObj
+            });
+
+          }
+        },
+        fail: function fail(res) {
+          // wx.showToast({ title: "1" })
+        }
+      });
+    }
+
+
+    onHide() {
+      // 切入后台取消定时器向后台发送websocket数据
+      // let that = this;
+      // clearInterval(that.data.timer);
+      console.log('==================>小程序 hide');
+    }
+
+    onReady() {
+      console.log('==================>小程序 onReady');
+    }
+
+    onUnload() {
+      console.log('==================>小程序 onUnload');
+    }
+
+    onLoad(options) {
+      let that = this;
+      that.initialLabelBeacon();
+      console.log('==================>小程序 onLoad', options);
+      this.paramsObj = options;
+      // this.$apply();
+      if (Object.keys(this.paramsObj).length !== 0) {
+        this.getChangeParamsObj(options);
+      } else {
+        // this.currentRoute();
+        that.getCloudOpenid()
+          .then(res => {
+            that.src = that.baseSrc + `?openid=${that.data.openid}`;
+            that.$apply();
+          });
+      }
+      // console.log('==============onload:', that.data.dataList);
+      // =================== 下面的不要了 ======================
+      //获取全部蓝牙标签数据
+      // that.getBluetooth();
+      // 获取版本号
+      // that.initialLabelBeacon();
+    }
+
+    onShow() {
+      let that = this;
+      //获取全部蓝牙标签数据
+      that.getBluetooth();
+      // 版本号初始化
+      // that.initialLabelBeacon();
+      // let currentRoute = this.currentRoute();
+      // console.log('currentRoute=======>', currentRoute);
+      console.log('==================>小程序 onShow');
+      that.getCloudOpenid()
+        .then(res => {
+          that.src = that.baseSrc + `?openid=${that.data.openid}`;
+          that.$apply();
+          that.showExe();
+        });
+
+
+      if (that.data.wxWebsocket !== null) {
+        if (that.data.wxWebsocket.readyState != 1) {
+          that.reconect();
+        }
+      }
+
+
+    }
+
+    /**
+     * 根据 major和minor检查该标签是否在标签库中
+     */
+    checkLabelInCache(major, minor) {
+      console.log('检查标签库');
+      let self = this;
+      let cacheKey = `${major}_${minor}`;
+      console.log('check one :', self.data.labelInStorage[cacheKey]);
+      if (self.data.labelInStorage[cacheKey]) {
+        return self.data.labelInStorage[cacheKey];
+      } else {
+        return false;
+      }
+    }
+
+
+    sortRssi(prop) {
+      return function(obj1, obj2) {
+        var val1 = obj1[prop];
+        var val2 = obj2[prop];
+        if (!isNaN(Number(val1)) && !isNaN(Number(val2))) {
+          val1 = Number(val1);
+          val2 = Number(val2);
+        }
+        if (val1 < val2) {
+          return 1;
+        } else if (val1 > val2) {
+          return -1;
+        } else {
+          return 0;
+        }
+      };
+    }
+
+    // 过滤蓝牙标签
+    fliterAndTransBlueTooth(data) {
+      let that = this;
+      let resultBeaconFilter = []; // 过滤找到蓝牙库中存在的标签数据
+      if (data.beacons != null) {
+        // 过滤找到蓝牙库中存在的标签数据
+        for (let i = 0, len = data.beacons.length; i < len; i++) {
+          let beaId = `${data.beacons[i].major}_${data.beacons[i].minor}`;
+          let exist = that.checkLabelInCache(data.beacons[i].major, data.beacons[i].minor);
+          if (exist) {
+            console.log('exist: ', exist, exist.floorId, exist.lat, exist.lng);
+            data.beacons[i].floorId = exist.floorId;
+            data.beacons[i].lat = exist.lat;
+            data.beacons[i].lng = exist.lng;
+            resultBeaconFilter.push(data.beacons[i]);
+          }
+        }
+        // 过滤掉rssi为0的对象
+        var resultBeaconFilterRssi = [];
+        for (let i = 0, len = resultBeaconFilter.length; i < len; i++) {
+          if (resultBeaconFilter[i].rssi !== 0) {
+            resultBeaconFilterRssi.push(resultBeaconFilter[i]);
+          }
+        }
+
+        // 根据 rssi 排序
+        console.log('rssi 排序前去掉rssi为0: ', resultBeaconFilterRssi);
+        resultBeaconFilterRssi.sort(that.sortRssi('rssi'));
+        // resultBeaconFilterRssi.sort(that.sortRssi);
+        console.log('rssi 排序后: ', resultBeaconFilterRssi);
+
+        // 取出前 5 个
+        let resultData = [];
+        for (let i = 0, j = 0, rslen = resultBeaconFilterRssi.length; i < rslen; i++) {
+          resultData.push(resultBeaconFilterRssi[j]);
+          j++;
+          if (j >= 5) {
+            break;
+          }
+        }
+
+
+        // // 根据 rssi 排序 old
+        // console.log('rssi 排序qian: ', resultBeaconFilter);
+        // resultBeaconFilter.sort(that.sortRssi('rssi'));
+        // // resultBeaconFilter.sort(that.sortRssi);
+        // console.log('rssi 排序后: ', resultBeaconFilter);
+        //
+        // // 取出前 5 个
+        // let resultData = [];
+        // for (let i = 0, j = 0, rslen = resultBeaconFilter.length; i < rslen; i++) {
+        //   resultData.push(resultBeaconFilter[j]);
+        //   j++;
+        //   if (j >= 5) {
+        //     break;
+        //   }
+        // }
+
+
+        console.log('end result: ', resultData);
+        console.log('过滤排序后蓝牙resultData===========', resultData);
+
+        // console.error('that.data.wxWebsocket',that.data.wxWebsocket);
+        if(that.data.wxWebsocket) {
+          that.data.wxWebsocket.send({
+            data: JSON.stringify({
+              'operationType': 'SEND_TRANSFER_DATA',
+              'operationParams': {
+                'testData': resultData
+              },
+              'extraData': ''
+            }),
+            success: (e) => {//接口调用成功的回调函数
+              console.log(e);
+            },
+            fail: (e) => {//接口调用失败的回调函数
+              console.log(e);
+            },
+            complete: (e) => {//接口调用结束的回调函数（调用成功、失败都会执行）
+              console.log(e);
+            }
+          });
+
+        }else if (!that.data.dataTransferWSActiveClose) {
+          // 断线重连
+          console.error('断线重连');
+          that.reconect();
+        }
+
+
+        // 把要传送的蓝牙标签数据保存下来
+
+        // wx.setStorage({
+        //   key: 'blueToothData',
+        //   data: resultData
+        // });
+
+        // that.setData({
+        //   blueData: resultData
+        // });
+
+
+        // 最终传送的蓝牙标签数据格式模板，即resultData值
+        // [{
+        //     floorId: "4"
+        //     lat: 3657847.6350787706
+        //     lng: 13502793.20426102
+        //     major: 10055
+        //     minor: 50312
+        //     rssi: -40
+        // },
+        // {
+        //   floorId: "4"
+        //   lat: 3657880.9051117236
+        //   lng: 13502801.720410021
+        //   major: 10055
+        //   minor: 50309
+        //   rssi: -36
+        // }]
+
+      } else {
+        console.log('beacons null');
+      }
+    }
+
+
+    // TODO 临时测试,模拟蓝牙数据
+    tmp_mock_beacon_data() {
+      let resultData = [
+        {
+          'accuracy': 0.0020490232064151867,
+          'floorId': '2',
+          'lat': 3657731.5211778902,
+          'lng': 13503195.945291389,
+          'major': 10055,
+          'minor': 51688,
+          'proximity': 0,
+          'rssi': -35,
+          'uuid': 'ab8190d5-d11e-4941-acc4-42f30510b408'
+        },
+        {
+          'accuracy': 0.003571771554522191,
+          'floorId': '4',
+          'lat': 3657847.6350787706,
+          'lng': 13502793.20426102,
+          'major': 10055,
+          'minor': 50312,
+          'proximity': 0,
+          'rssi': -37,
+          'uuid': 'ab8190d5-d11e-4941-acc4-42f30510b408'
+        },
+        {
+          'accuracy': 0.012687011617503758,
+          'floorId': '2',
+          'lat': 3657736.008669155,
+          'lng': 13503175.650349328,
+          'major': 10055,
+          'minor': 51687,
+          'proximity': 0,
+          'rssi': -42,
+          'uuid': 'ab8190d5-d11e-4941-acc4-42f30510b408'
+        },
+        {
+          'accuracy': 0.03150973497515332,
+          'floorId': '4',
+          'lat': 3657880.9051117236,
+          'lng': 13502801.720410021,
+          'major': 10055,
+          'minor': 50309,
+          'proximity': 0,
+          'rssi': -46,
+          'uuid': 'ab8190d5-d11e-4941-acc4-42f30510b408'
+        }
+      ];
+      // 把要传送的蓝牙标签数据保存下来
+      // wx.setStorage({
+      //   key: 'blueToothData',
+      //   data: resultData
+      // });
+      // console.log('mock beacon data');
+    }
+
+    //关闭成功后开启搜索
+    stopSearchBeacom() {
+      let that = this;
+      wx.stopBeaconDiscovery({
+        success: function() {
+          that.searchBeacon();
+        }
+      });
+    }
+
+
+    //搜索函数
+    searchBeacon(listener) {
+      let that = this;
+      console.log('searchBeacon...');
+      //检测蓝牙状态
+      wx.openBluetoothAdapter({
+        success: function(res) {//蓝牙状态：打开
+          console.log('蓝牙打开');
+          wx.startBeaconDiscovery({//开始搜索附近的iBeacon设备
+            uuids: ['AB8190D5-D11E-4941-ACC4-42F30510B408'],//参数uuid
+            success: function(res) {
+              console.log('搜索成功');
+              wx.onBeaconUpdate(function(res) {//监听 iBeacon 设备的更新事件
+                console.log('监听 iBeacon 设备的更新事件');
+                console.log('iBeacon 设备:', res);
+                // that.data.blueToothDataTrans = that.jiqquqianwuge(res);
+
+                that.fliterAndTransBlueTooth(res); // 过滤排序
+
+                //封装请求数据
+                var beacons = res.beacons;
+                var reqContent = {};
+                var bleArray = [];
+                for (var i = 0; i < beacons.length; i++) {
+                  var bleObj = {};
+                  bleObj.distance = beacons[i].accuracy;
+                  bleObj.rssi = beacons[i].rssi;
+                  bleObj.mac = beacons[i].major + ':' + beacons[i].minor;
+                  bleArray.push(bleObj);
+                }
+                // console.log('bleArray:',bleArray);
+                reqContent.ble = bleArray;
+
+              });
+            },
+            fail: function(res) {
+              //先关闭搜索再重新开启搜索,这一步操作是防止重复wx.startBeaconDiscovery导致失败
+              that.stopSearchBeacom();
+            }
+          });
+        },
+        fail: function(res) {//蓝牙状态：关闭
+          wx.showToast({ title: '请打开蓝牙', icon: 'none', duration: 5000 });
+        }
+      });
+    }
+
+    // 测试
+    jiqquqianwuge(data) {
+      if (data.beacons != null) {
+        let len = data.beacons.length;
+        console.log('scan beacons length: ', len);
+        let resdata = [];
+        let j = 0;
+        if (len > 5) {
+          for (let i = 0; i < len; i++) {
+            if (data.beacons[i]['rssi'] !== 0) {
+              resdata.push(data.beacons[i]);
+              j++;
+              if (j > 5) {
+                break;
+              }
+            }
+          }
+        } else {
+          resdata = data.beacons;
+        }
+        console.log('resdata:', resdata);
+        return resdata;
+      } else {
+        console.log('beacons null');
+      }
+    }
+
+    // 重连websocket
+    reconect() {
+      let that = this;
+      that.initDataTransferWS();
+    }
+
+    // 显示执行
+    showExe() {
+      let that = this;
+      console.log('onshow openid:', that.data.openid);
+
+      //监测蓝牙状态的改变
+      wx.onBluetoothAdapterStateChange(function(res) {
+        console.log('监测蓝牙状态的改变');
+        if (res.available) {//如果用户打开蓝牙，开始搜索IBeacon
+          that.searchBeacon();
+        }
+      });
+
+      that.searchBeacon();
+      console.log('搜索蓝牙');
+      that.initDataTransferWS();
+
+    }
+
+    // 初始化 websocket 数据传送
+    initDataTransferWS() {
+      let that = this;
+      console.log('初始化数据传送的 websocket ');
+      //创建websocket 连接
+      that.data.wxWebsocket = wx.connectSocket({
+        url: websocketUrl + '/manage/websocket/WSTransfer',
+        header: {
+          'content-type': 'application/json'
+        },
+        timeout: 50000,//超时时间，单位为毫秒
+        success: (e) => {//接口调用成功的回调函数
+          console.log(99999999);
+          console.error('websocket创建成功', e);
+        },
+        fail: (e) => {//接口调用失败的回调函数
+          console.error(e);
+        },
+        complete: (e) => {//接口调用结束的回调函数（调用成功、失败都会执行）
+          console.error(e);
+        }
+      });
+
+      //接受消息
+      that.data.wxWebsocket.onMessage((e) => {
+        console.error('接收消息', e);
+      });
+
+      //监听 WebSocket 连接关闭事件
+      that.data.wxWebsocket.onClose((e) => {
+        console.error('websocket onclose');
+        that.data.wxWebsocket = null;
+      });
+
+      //监听 WebSocket 错误事件
+      that.data.wxWebsocket.onError((e) => {
+        console.error('websocket onerror');
+      });
+
+      //连接打开事件
+      that.data.wxWebsocket.onOpen(() => {
+        console.log('websocket onopen');
+        that.data.wxWebsocket.send({
+          // data:JSON.stringify(res.data),//需要发送的内容
+          data: JSON.stringify({
+            'operationType': 'SET_DATA_UNID',
+            'operationParams': {
+              'unid': that.data.openid
+            },
+            'extraData': ''
+          }),
+          success: (e) => {//接口调用成功的回调函数
+            console.log(e);
+          },
+          fail: (e) => {//接口调用失败的回调函数
+            console.log(e);
+          },
+          complete: (e) => {//接口调用结束的回调函数（调用成功、失败都会执行）
+            console.log(e);
+          }
+        });
+
+        // 定时传送蓝牙标签数据
+        // that.data.dataTransferTimer = setInterval(() => {
+        //   // console.log('websocket timer Interval !', that.data.count++);
+        //   if (that.data.wxWebsocket) {
+        //     console.error('that.state.blueData', that.data.blueData);
+        //     console.log('that.data.dataTransferWSActiveClose: ', that.data.dataTransferWSActiveClose);
+        //     wx.getStorage({
+        //       key: 'blueToothData',
+        //       success(res) {
+        //         console.error('websocket timer send ... ', res.data);
+        //         that.data.wxWebsocket.send({
+        //           data: JSON.stringify({
+        //             'operationType': 'SEND_TRANSFER_DATA',
+        //             'operationParams': {
+        //               'testData': res.data
+        //             },
+        //             'extraData': ''
+        //           }),
+        //           success: (e) => {//接口调用成功的回调函数
+        //             console.log(e);
+        //           },
+        //           fail: (e) => {//接口调用失败的回调函数
+        //             console.log(e);
+        //           },
+        //           complete: (e) => {//接口调用结束的回调函数（调用成功、失败都会执行）
+        //             console.log(e);
+        //           }
+        //         });
+        //       }
+        //     });
+        //   } else if (!that.data.dataTransferWSActiveClose) {
+        //     // 断线重连
+        //     clearInterval(that.data.dataTransferTimer);
+        //     console.error('断线重连');
+        //     that.reconect();
+        //   }
+        // }, 1000);
+      });
+    }
+
+  }
+</script>
+
+<style lang="less">
+  .userinfo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .userinfo-avatar {
+    width: 80 rpx;
+    height: 80 rpx;
+    border-radius: 50%;
+  }
+
+  .userinfo-nickname {
+    color: #aaa;
+  }
+</style>

@@ -1,0 +1,36 @@
+<template>
+  <view>
+    分享界面
+  </view>
+</template>
+<script>
+  import wepy from 'wepy'
+
+  export default class Counter extends wepy.component {
+    data = {
+
+    }
+
+    methods = {
+      
+    }
+  }
+</script>
+
+
+<style lang="less">
+  .counter {
+    text-align: left;
+    font-size: 12px;
+  }
+  .count {
+    font-size: 18px;
+    font-weight: bold;
+    &.red {
+      color: red;
+    }
+    &.green {
+      color: green;
+    }
+  }
+</style>

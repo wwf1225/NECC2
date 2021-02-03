@@ -1,0 +1,103 @@
+<style lang="less">
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+</style>
+
+<!-- 东浩广印展-->
+
+<script>
+import wepy from 'wepy';
+import 'wepy-async-function';
+import locales from './utils/locales.js';
+import T from './utils/i18n.js';
+
+
+export default class extends wepy.app {
+  config = {
+    pages: [
+      'pages/index',
+      'pages/share/index',
+      'pages/about/index',
+      'pages/hot/index',
+      'pages/coupon/index'
+    ],
+    window: {
+      backgroundTextStyle: 'dark',
+      backgroundColor: '#F5F5F5',
+      navigationBarBackgroundColor: '#d1312a',
+      pageOrientation: "portrait"
+    }
+  }
+
+  globalData = {
+    userInfo: null,
+    PoiFid: null,
+  }
+
+  constructor () {
+    super()
+    this.use('requestfix')
+  }
+
+  onLaunch() {
+    console.log('on launch');
+    T.registerLocale(locales);
+
+    //语言包设置非中文和英文则显示中文
+    var locate = wepy.getSystemInfoSync().language;
+    if(locate === "zh_CN"){
+      T.setLocale(locate);
+    }else if(locate === "en"){
+      T.setLocale(locate);
+    }else{
+      locate="zh_CN";
+      T.setLocale(locate);
+    }
+    const version = wx.getSystemInfoSync().SDKVersion;
+    console.error(wx);
+
+    if (!wx.cloud) {
+      console.error('请使用 2.2.3 或以上的基础库以使用云能力')
+    } else {
+      wx.cloud.init({
+        traceUser: true
+      })
+    }
+
+    //navigateToMiniProgramAppIdList: [
+    //   "要跳转目标小程序的appid"
+    // ]
+
+    // wepy.showToast({
+    //   title: `${locate}`,
+    //   icon: 'none',
+    //   duration: 2000
+    // })
+
+    // wepy.getSystemInfo().then( res=>{
+    //   console.log(res);
+    // })
+    // wepy.getSystemInfoSync()
+  }
+
+  // getUserInfo(cb) {
+  //   const that = this
+  //   if (this.globalData.userInfo) {
+  //     return this.globalData.userInfo
+  //   }
+  //   wepy.getUserInfo({
+  //     success (res) {
+  //       console.log(res);
+  //       that.globalData.userInfo = res.userInfo
+  //       cb && cb(res.userInfo)
+  //     }
+  //   })
+  // }
+
+}
+</script>

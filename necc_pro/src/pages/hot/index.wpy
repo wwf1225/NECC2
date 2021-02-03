@@ -1,0 +1,24 @@
+<template>
+  <web-view src="{{src}}"></web-view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import T from "../../utils/i18n.js";
+  import {url_hot_search} from "../../utils/wx_common";
+
+  export default class AboutAs extends wepy.page {
+    data = {
+      src: ""
+    }
+
+    onLoad(options) {
+      this.src = url_hot_search;
+      this.$apply();
+    }
+  }
+</script>
+
+<style lang="less">
+
+</style>
